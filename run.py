@@ -98,11 +98,18 @@ if train:
   model.save_weights('model.h5')
 
 else:
+  hfile  = open('history.json', 'r')
+  hjson  = hfile.read()
+
+  hfile.close()
+
+  ##
   ofile  = open('model.json', 'r')
   ojson  = ofile.read()
 
   ofile.close()
 
+  ## 
   model  = model_from_json(ojson)
   model.load_weights('model.h5')
  
