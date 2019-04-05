@@ -1,4 +1,5 @@
 import  matplotlib;                matplotlib.use('Agg')
+import  os
 import  copy
 
 from    keras.datasets     import  mnist
@@ -13,34 +14,56 @@ import  pylab              as      pl
 import  numpy              as      np
 
 
+nseeds  = 10 
 train   = True
 
 print('\n\nWelcome.\n\n')
 
-X       = np.zeros((10, 128, 128, 128))
+cosmos  = np.loadtxt('cosmo.txt').tolist()
+labels  = []
 
-for i, seed in enumerate(np.arange(42, 52, 1)):
-  mesh       = BigFileMesh('fields/field_%d' % seed, 'Field')
+for x in cosmos:
+  for i in np.arange(nseeds):
+    labels.append(x)
+
+nruns   = len(labels)
+labels  = np.array(labels)
+
+nruns   = 100
+X       = np.zeros((nruns, 128, 128, 128))
+
+for iid in np.arange(nruns):
+  print('Loading %d' % iid)
+
+  root       = os.environ['CSCRATCH']
+  mesh       = BigFileMesh(root + '/MLRSD/fields/field_%d' % iid, 'Field')
   X[i,:,:,:] = mesh.preview()
 
+##  digitize in f.
+bins     = np.arange(0.4, 0.6, 1.e-3)
+
 ##  128 x 128 x 128 pixels, with 60K items in train and 10K in validation.
-X_train  = X.reshape(10, 128, 128, 128, 1)
+X_train  = X.reshape(nruns, 128, 128, 128, 1)
 X_test   = copy.copy(X_train)
 
-_y_train = np.random.randint(10, size=10)
-_y_test  = np.random.randint(10, size=10)
+_y_train = np.digitize(labels[:,2][:nruns], bins)
+_y_test  = np.digitize(labels[:,2][:nruns], bins)
 
-##  one-hot encode target column.
+##  One-hot encode target column.
 y_train  = to_categorical(_y_train)
 y_test   = to_categorical(_y_test)
+
+nhot     = len(y_test[0,:])
+
+print(nhot)
 
 if train:
   model  = Sequential()
 
-  model.add(Conv3D(64, kernel_size=3, activation='relu', input_shape=(128, 128, 128, 1)))
-  model.add(Conv3D(32, kernel_size=3, activation='relu'))
+  model.add(Conv3D(64, kernel_size=8, activation='relu', input_shape=(128, 128, 128, 1)))
+  model.add(Conv3D(32, kernel_size=8, activation='relu'))
   model.add(Flatten())
-  model.add(Dense(10, activation='softmax'))
+  model.add(Dense(nhot, activation='softmax'))
 
   model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
