@@ -41,15 +41,11 @@ for iid in np.arange(nruns):
   print('Loading %d' % iid)
 
   fpath             = '/global/cscratch1/sd/mjwilson/MLRSD/fastpm/fpm-%d-1.0000' % iid
-  cat               = BigFileCatalog(fpath, dataset='1/', header='Header')
 
-  rsd_factor        = cat.attrs['RSDFactor']
-  cat['zPosition']  = cat['Position'] + rsd_factor * cat['Velocity'] * LOS
+  mesh              = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header')
+  X[iid,:,:,:]      = mesh.preview()
 
-  mesh              = cat.to_mesh(Nmesh=128, BoxSize=1000., position='zPosition')
-  field             = mesh.to_field(mode='complex')
-
-  X[i,:,:,:]        = mesh.preview()
+exit(1)
 
 ##  digitize in f.
 fmin     = labels[:,2].min()
