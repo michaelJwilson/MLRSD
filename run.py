@@ -1,19 +1,26 @@
 import  matplotlib
+import  pickle
 import  os
 import  json
 import  copy
+import  tensorflow         as      tf
 
-from    keras.datasets     import  mnist
-from    keras.utils        import  to_categorical
-from    keras.models       import  Sequential
-from    keras.layers       import  Dense, Conv2D, Flatten, Conv3D, Dropout
-from    keras.models       import  model_from_json
-from    nbodykit.lab       import  LinearMesh, cosmology, BigFileMesh, BigFileCatalog
+from    tensorflow.keras.utils     import  to_categorical
+from    tensorflow.keras.models    import  Sequential
+from    tensorflow.keras.layers    import  Dense, Conv2D, Flatten, Conv3D, Dropout
+from    tensorflow.keras.models    import  model_from_json
+from    nbodykit.lab               import  LinearMesh, cosmology, BigFileMesh, BigFileCatalog
 
 import  matplotlib.pyplot  as      plt
 import  pylab              as      pl
 import  numpy              as      np
 
+
+##  module load python/3.6-anaconda-4.4 
+##  source /usr/common/contrib/bccp/conda-activate.sh 3.6
+##  module load tensorflow/intel-1.11.0-py36
+##  export PYTHONPATH=$PYTHONPATH/usr/common/software/tensorflow/intel-tensorflow/1.11.0-py36/lib/python3.6/site-packages/
+##  conda install tensorflow -c intel
 
 nseeds  = 10 
 train   = True
@@ -30,74 +37,74 @@ for x in cosmos:
 nruns   = len(labels)
 labels  = np.array(labels)
 
-nruns   = 400
-nvalid  =  75
-
-X       = np.zeros((nruns, 128, 128, 128))
+##  Split in batches of 50.
+nsplit  =  50
+nvalid  =  20
+ntimes  =  np.floor(nruns / nsplit)
 
 LOS     = [0,0,1]
 
-for iid in np.arange(nruns):
-  print('Loading %d' % iid)
+##  digitize in f.                                                                                                                                                               
+fmin     = .25 ** 0.545
+fmax     = .35 ** 0.545
 
-  fpath             = '/global/cscratch1/sd/mjwilson/MLRSD/fastpm/fpm-%d-1.0000' % iid
-
-  mesh              = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header')
-  X[iid,:,:,:]      = mesh.preview()
-
-exit(1)
-
-##  digitize in f.
-fmin     = labels[:,2].min()
-fmax     = labels[:,2].max()
-
+nhot     = 20
 bins     = np.linspace(fmin, fmax, 20)
 
-##  128 x 128 x 128 pixels, with 60K items in train and 10K in validation.
-X        = X.reshape(nruns, 128, 128, 128, 1)
-X_train  = X[nvalid:, :, :, :, :]
-X_test   = X[:nvalid, :, :, :, :]
+model    = Sequential()
+model.add(Conv3D(64, kernel_size=3, activation='relu', input_shape=(128, 128, 128, 1)))
+model.add(Dropout(0.1))
+model.add(Conv3D(64, kernel_size=3, activation='relu'))
+model.add(Dropout(0.1))
+model.add(Flatten())
 
-_y_train = np.digitize(labels[:,2][nvalid:nruns], bins)
-_y_test  = np.digitize(labels[:,2][:nvalid], bins)
+##  nhot scores sum to one.
+model.add(Dense(nhot, activation='softmax'))                                                                                                                                  
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-##  One-hot encode target column.
-y_train  = to_categorical(_y_train)
-nhot     = len(y_train[0,:])
-
-y_test   = to_categorical(_y_test, num_classes=nhot)
-
-print(nhot)
-
-if train:
-  model  = Sequential()
-
-  model.add(Conv3D(64, kernel_size=3, activation='relu', input_shape=(128, 128, 128, 1)))
-  model.add(Dropout(0.3))
-  model.add(Conv3D(32, kernel_size=3, activation='relu'))
-  model.add(Dropout(0.3))
-  model.add(Flatten())
-  model.add(Dense(nhot, activation='softmax'))  ##  nhot scores sum to one. 
-
-  model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-  history    = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5, batch_size=28)
+for ii, split in enumerate(np.arange(ntimes)): 
+  zero   = ii * nsplit  
   
-  with open('history.json', 'w') as fp:
-    json.dump(history.history, fp, sort_keys=True, indent=4)
+  ##  128 x 128 x 128 pixels, with 60K items in train and 10K in validation. 
+  X      = np.zeros((nsplit, 128, 128, 128, 1))
+
+  for iid in np.arange(nsplit):
+    mid  = zero + iid
+
+    print('Loading %d' % mid)
+
+    fpath           = '/global/cscratch1/sd/mjwilson/MLRSD/fastpm/fpm-%d-1.0000' % mid
+
+    mesh            = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header')
+    X[iid,:,:,:, :] = mesh.preview()
+   
+  X_train         = X[nvalid:, :, :, :, :]
+  X_test          = X[:nvalid, :, :, :, :]
+  
+  _labels         = labels[zero : zero + nsplit]
+
+  _y_train        = np.digitize(_labels[:,2][nvalid:], bins)
+  _y_test         = np.digitize(_labels[:,2][:nvalid], bins)
+
+  ##  One-hot encode target column.
+  y_train         = to_categorical(_y_train, num_classes=nhot)
+  y_test          = to_categorical(_y_test,  num_classes=nhot)
+
+  history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=2, batch_size=16)
+  history = history.history
+
+  pickle.dump(history, open('history/history_%d.p' % zero, 'wb'))
 
   model_json = model.to_json()
 
-  with open('model.json', 'w') as json_file:
+  with open('model/model_%d.json' % zero, 'w') as json_file:
     json_file.write(model_json)
 
-  model.save_weights('model.h5')
+  ##  model.save_weights('model.h5')
 
+'''
 else:
-  hfile  = open('history.json', 'r')
-  hjson  = hfile.read()
-
-  hfile.close()
+  history = pickle.load(open('history.p', 'rb'))
 
   ##
   ofile  = open('model.json', 'r')
@@ -110,6 +117,7 @@ else:
   model.load_weights('model.h5')
  
   model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+'''
 
 predictions = model.predict(X_test)
 score       = model.evaluate(X_test, y_test, verbose=0)
@@ -118,17 +126,17 @@ print('Test loss:',     score[0])
 print('Test accuracy:', score[1])
 
 ##  Plot.
-loss = history.history['loss']
-val_loss = history.history['val_loss']
+for stat in ['loss', 'acc']:
+  tstat  = history[stat]
+  vstat  = history['val_' + stat]
 
-epochs = range(1, len(loss) + 1)
+  epochs = range(1, 1 + len(tstat))
 
-plt.plot(epochs, loss, 'bo', label='Training loss')
-plt.plot(epochs, val_loss, 'b', label='Validation loss')
-plt.title('Training and validation loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
+  plt.plot(epochs, tstat, 'bo', label='Training')
+  plt.plot(epochs, vstat, 'b',  label='Validation')
+  plt.xlabel('EPOCHS')
+  plt.ylabel(stat.upper())
+  plt.legend()
+  plt.show()
 
 print('\n\nDone.\n\n')
