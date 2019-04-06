@@ -76,7 +76,7 @@ for ii, split in enumerate(np.arange(ntimes)):
     fpath           = '/global/cscratch1/sd/mjwilson/MLRSD/fastpm/fpm-%d-1.0000' % mid
 
     mesh            = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header')
-    X[iid,:,:,:, :] = mesh.preview()
+    X[iid,:,:,:, 0] = mesh.preview()
    
   X_train         = X[nvalid:, :, :, :, :]
   X_test          = X[:nvalid, :, :, :, :]
