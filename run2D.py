@@ -9,7 +9,7 @@ from    tensorflow.keras.utils               import  to_categorical
 from    tensorflow.keras.models              import  Sequential
 from    tensorflow.keras.layers              import  Dense, Conv2D, Flatten, Conv3D, Dropout, MaxPooling2D, BatchNormalization
 from    tensorflow.keras.models              import  model_from_json
-from    tensorflow.keras.preprocessing.image import ImageDataGenerator
+from    tensorflow.keras.preprocessing.image import  ImageDataGenerator
 from    nbodykit.lab                         import  LinearMesh, cosmology, BigFileMesh, BigFileCatalog
 
 import  matplotlib.pyplot  as      plt
@@ -20,8 +20,7 @@ import  numpy              as      np
 def prep_model2DA(nhot):
   model = Sequential()
 
-  ##  output = relu(dot(W, input) + b);  W (input_dimension, 16).
-  ##  https://arxiv.org/pdf/1807.08732.pdf
+  ##  https://arxiv.org/pdf/1807.08732.pdf;  output = relu(dot(W, input) + b);  E.g.  W (input_dimension, 16).
   model.add(Conv2D(16, kernel_size=8, strides=2, padding='valid', activation='relu', input_shape=(128, 128, 1)))
   model.add(Dropout(0.1))
   model.add(Conv2D(32, kernel_size=4, strides=2, padding='valid', activation='relu'))
@@ -73,14 +72,10 @@ def pprocess(X):
   npix          = np.random.randint(128)
   sign          = -1. ** np.random.randint(2)
 
+  ##  Add Poisson Sampling. 
+ 
   return  sign * np.roll(X, npix, axis=axis)
   
-##  module load python/3.6-anaconda-4.4                                                                                                         
-##  source /usr/common/contrib/bccp/conda-activate.sh 3.6                                                                                    
-##  module load tensorflow/intel-1.11.0-py36                                                                                              
-##  export PYTHONPATH=$PYTHONPATH/usr/common/software/tensorflow/intel-tensorflow/1.11.0-py36/lib/python3.6/site-packages/                    
-##  conda install tensorflow -c intel 
-
 nseeds  = 10
 nslice  = 10
 train   = True
@@ -105,7 +100,7 @@ ntimes  =  np.floor(nruns / nsplit)
 
 LOS     = [0,0,1]
 
-##  digitize in f.                                                                                                                                                               
+##  digitize in f.                                                                                                                                               
 fmin     = .25 ** 0.545
 fmax     = .35 ** 0.545
 
@@ -131,6 +126,7 @@ for split in np.tile(np.arange(ntimes), 4):
 
     for sslice in np.arange(nslice):
       X[iid + 10 * sslice,:,:, 0] = mesh[:,sslice,:]
+
   
   X_train         = X[:, :, :, :]    
 
