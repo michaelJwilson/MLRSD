@@ -11,4 +11,7 @@ srun --pty -u bash -i
 
 ## Check GPU availability. 
 from tensorflow.python.client import device_lib
-print(device_lib.list_local_devices())
+
+x = device_lib.list_local_devices()
+
+print(x)
