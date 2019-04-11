@@ -101,43 +101,47 @@ def pprocess(X):
   sign = -1. ** np.random.randint(2)
 
   return  sign * np.roll(X, npix, axis=axis)
-  
+
+def get_cosmos():
+  ##  Get list of available cosmologies.                                                                                                                                           
+  cosmos    = np.loadtxt('cosmo.txt').tolist()
+  labels    = []
+
+  for x in cosmos:
+    for i in np.arange(nseeds):
+      for j in np.arange(nslice):
+        labels.append(x)
+
+  labels  =  np.array(labels)
+
+  return  labels
+
 
 if __name__ == '__main__':
   print('\n\nWelcome to MLRSD-2D.\n\n')
 
   train, regressor = True, True
 
-  optimizer  = adam
+  optimizer  =  adam
   
-  nseeds     =   10     ##  Number of random (seed) sims available in each cosmology. 
-  nslice     =   10     ##  Sliced 3D sim. into _nslice_ (x, z) slices.  
-  nhot       =   10     ##  Label sims by bin index in f;  nhot == # of bins. 
-  nruns      =  900     ##  Limit the number of mocks input;  None == All. 
-  nsplit     =  100     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
-  ntile      =    5     ##  Number of load, train epochs through the data.      
-  epochs     =    5     ##  Number of actual (keras) epochs. 
-  valid_frac = 0.15
+  nseeds     =    10     ##  Number of random (seed) sims available in each cosmology. 
+  nslice     =    10     ##  Sliced 3D sim. into _nslice_ (x, z) slices.  
+  nhot       =    10     ##  Label sims by bin index in f;  nhot == # of bins. 
+  nruns      =   900     ##  Limit the number of mocks input;  None == All. 
+  nsplit     =   100     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
+  ntile      =     1     ##  Number of load, train epochs through the data.      
+  epochs     =     5     ##  Number of actual (keras) epochs. 
+  valid_frac =  0.15
   
   ##  Set up the model.
-  model     = prep_model_2D_B(nhot, optimizer=optimizer, regressor=regressor)
-  
-  ##  Get list of available cosmologies. 
-  cosmos    = np.loadtxt('cosmo.txt').tolist()
-  labels    = []
-  
-  for x in cosmos:
-    for i in np.arange(nseeds):
-      for j in np.arange(nslice):
-        labels.append(x)
+  model     = prep_model_2D_B(None, optimizer=optimizer, regressor=regressor)
 
+  labels    = get_cosmos()
+  
   if nruns is None:
-    nruns   =  len(cosmos) * nseeds
+    nruns   =  len(labels) * nseeds
 
-  labels  =  np.array(labels)
-  ntimes  =  np.floor(nruns / nsplit)
-
-  LOS     = [0,0,1]
+  ntimes    =  np.floor(nruns / nsplit)
 
   if not regressor:
     ##  Bin sims in f and use bin index as a supervised label.
@@ -183,18 +187,17 @@ if __name__ == '__main__':
       ##  Fit whitening params. 
       train_gen.fit(X)
 
-
       y               = labels[zero * nslice: (zero + nsplit) * nslice, 2]  
 
-      if not regressor:_
-        y             = np.digitize(labels[zero * nslice: (zero + nsplit) * nslice, 2], bins) 
+      if not regressor:
+        y             = np.digitize(y, bins) 
 
         ##  One-hot encode target column.
         y             = to_categorical(y, num_classes=nhot)
-
+      
       ##  Image generator for continous cretion with pre-processing;  steps_per_epoch=10 * len(X_train) / 32.
       history         = model.fit_generator(train_gen.flow(X, y, batch_size=2000, shuffle=True),\
-                                            steps_per_epoch=6000, epochs=epochs)
+                                            steps_per_epoch=6000, epochs=1)
       
       history         = history.history
       pickle.dump(history, open('history/history_%d.p' % zero, 'wb'))
@@ -227,8 +230,8 @@ if __name__ == '__main__':
     ##  Test the predictions;  Should be on test set rather than full set. 
     X_train, X_test, y_train, y_test = train_test_split(X[::-1, :, : ,:], y[::-1], test_size=valid_frac)
     
-    predictions  =  model.predict(X_train)
-    score        =  model.evaluate(X_train, y_train, verbose=0)
+    predictions =  model.predict(X_test)
+    score       =  model.evaluate(X_test, y_test, verbose=0)
 
     print('Test loss:',     score[0])
     print('Test accuracy:', score[1])
