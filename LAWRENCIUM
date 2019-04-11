@@ -1,0 +1,14 @@
+module load python/3.6
+module load cuda/10.0
+
+##  CONDA ENV
+conda install tensorflow-gpu -c intel
+conda install ipykernel 
+
+## INTERACTIVE
+salloc --time=00:30:00 --nodes=1 --partition es1  --constraint=es1_1080ti --qos=es_debug
+srun --pty -u bash -i
+
+## Check GPU availability. 
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())

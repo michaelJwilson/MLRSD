@@ -1,13 +1,13 @@
-import  matplotlib;                matplotlib.use('Agg')
+##  import  matplotlib;                   matplotlib.use('Agg')
 
-from    keras.datasets     import  mnist
-from    keras.utils        import  to_categorical
-from    keras.models       import  Sequential
-from    keras.layers       import  Dense, Conv2D, Flatten
-from    keras.models       import  model_from_json
+from    tensorflow.keras.datasets     import  mnist
+from    tensorflow.keras.utils        import  to_categorical
+from    tensorflow.keras.models       import  Sequential
+from    tensorflow.keras.layers       import  Dense, Conv2D, Flatten
+from    tensorflow.keras.models       import  model_from_json
 
-import  matplotlib.pyplot  as      plt
-import  pylab              as      pl
+##  import  matplotlib.pyplot  as      plt
+##  import  pylab              as      pl
 import  numpy              as      np
 
 
@@ -43,7 +43,7 @@ if train:
     json_file.write(model_json)
 
   model.save_weights('model.h5')
-
+'''
 else:
   ofile  = open('model.json', 'r')
   ojson  = ofile.read()
@@ -74,5 +74,5 @@ for i in range(25):
   plt.xlabel(_y_train[i])
 
 plt.savefig('mnist.png')
-
+'''
 print('\n\nDone.\n\n')
