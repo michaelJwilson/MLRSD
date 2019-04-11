@@ -25,20 +25,20 @@ np.random.seed(seed=314)
 adam    =  Adam(lr=1.e-4, amsgrad=True, clipnorm=1.)
 nadam   = Nadam(lr=1.e-4, beta_1=0.9, beta_2=0.999, epsilon=None, schedule_decay=0.004, clipnorm=1.)
 
-def prep_model_2D_A(nhot):
+def prep_model_2D_A(nhot, nmesh=128):
   ##  Loosely based on:  https://arxiv.org/pdf/1807.08732.pdf
   model = Sequential()
 
   ##  layer output = relu(dot(W, input) + b);  E.g.  W (input_dimension, 16).
-  model.add(Conv2D(16, kernel_size=8, strides=2, padding='valid', activation='relu', input_shape=(128, 128, 1)))
+  model.add(Conv2D(16, kernel_size=8, strides=2, padding='valid', activation='relu', input_shape=(nmesh, nmesh, 1)))
   model.add(Dropout(0.1))
   model.add(Conv2D(32, kernel_size=4, strides=2, padding='valid', activation='relu'))
   model.add(Dropout(0.1))
-  model.add(Conv2D(128, kernel_size=4, strides=2, padding='valid', activation='relu'))
+  model.add(Conv2D(nmesh, kernel_size=4, strides=2, padding='valid', activation='relu'))
   model.add(Dropout(0.1))
   model.add(Conv2D(64, kernel_size=4, strides=2, padding='valid', activation='relu'))
   ##  model.add(Dropout(0.1))
-  model.add(Conv2D(256, kernel_size=4, strides=2, padding='valid', activation='relu', input_shape=(128, 128, 1)))  ##  16 output units. 
+  model.add(Conv2D(256, kernel_size=4, strides=2, padding='valid', activation='relu', input_shape=(nmesh, nmesh, 1)))  ##  16 output units. 
   ##  model.add(Dropout(0.1))
 
   model.add(Flatten())
@@ -55,11 +55,12 @@ def prep_model_2D_A(nhot):
 
   return  model
 
-def prep_model_2D_B(nhot=1, optimizer=adam, regress=True, loss='mse'):
+def prep_model_2D_B(nhot=1, optimizer=adam, regress=True, loss='mae', nmesh=128):
   print("\n\nPreparing model.\n\n")
 
-  model = Sequential()
-
+  _input = (nmesh, nmesh, 1)
+  
+  model  = Sequential()
   model.add(SeparableConv2D(32, (3, 3), activation='linear', input_shape=(128, 128, 1))) 
   model.add(LeakyReLU(alpha=0.03))
   model.add(MaxPooling2D((2, 2)))
@@ -84,10 +85,31 @@ def prep_model_2D_B(nhot=1, optimizer=adam, regress=True, loss='mse'):
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
   
   model.summary()
+  
+  return  model
+
+def prep_model_2D_C(nhot=1, optimizer=adam, regress=True, loss='mae', nmesh=128):
+  print("\n\nPreparing model.\n\n")
+
+  _input = (nmesh, nmesh, 1)
+
+  model  = Sequential()
+  model.add(Flatten(input_shape=_input))
+  model.add(Dense(32, activation='relu'))
+  model.add(Dense(32, activation='relu'))
+  model.add(Dense(1,  activation='sigmoid'))
+  
+  if regress:                                                                                                                                                                                                                                                                                                                
+    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
+
+  else:
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+
+  model.summary()
 
   return  model
 
-def pprocess(X):
+def pprocess(X, nmesh=128):
   ##  Pre-process each 2D n-body slice:
   ##  --  Roll along random axis by random int npix.
   ##  --  Random sign (should be applied to delta).
@@ -95,7 +117,7 @@ def pprocess(X):
   ##  --  To be added:  Rescale amplitude by an arbitrary growth factor. 
   
   axis = np.random.randint(2)
-  npix = np.random.randint(128)
+  npix = np.random.randint(nmesh)
 
   ##  Random assignment of delta -> -delta. 
   sign = -1. ** np.random.randint(2)
@@ -119,6 +141,8 @@ def get_cosmos(nruns, nseeds, nslice):
   return  labels
 
 def plot(y, yhat, save=False):
+  pl.clf()
+  
   fmin  = .25 ** 0.545
   fmax  = .35 ** 0.545
 
@@ -142,19 +166,20 @@ if __name__ == '__main__':
   optimizer      =  adam
   
   nseeds         =     9     ##  Number of random (seed) sims available in each cosmology. 
-  nslice         =    10     ##  Sliced 3D sim. into _nslice_ (x, z) slices.  
+  nslice         =    16     ##  Sliced 3D sim. into _nslice_ (x, z) slices.  
   nhot           =    10     ##  Supervised:  label sims by bin index in f;  nhot == # of bins. 
+  nmesh          =   128
   nruns          =   900     ##  Limit the total number of mocks input;  Set to e.g. 1e99 for all. 
-  nsplit         =    50     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
+  nsplit         =   900     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
   ntile          =     1     ##  Number of load, train epochs through the data.      
-  epochs         =     5     ##  Number of actual (keras) epochs. 
+  epochs         =   500     ##  Number of actual (keras) epochs. 
   valid_frac     =  0.15     ##  Split data X into fractions for train, validate/test.    
 
-  ntimes         =  np.floor(nruns / nsplit)  ##  Number of splits required.      
+  jump           =  np.floor(nmesh / nslice).astype(np.int)
+  ntimes         =  np.floor(nruns / nsplit)                  ##  Number of splits required.      
   
-  model          = prep_model_2D_B(None, optimizer=optimizer, regress=regress)
-
-  labels         = get_cosmos(nruns, nseeds, nslice)
+  model          =  prep_model_2D_C(None, optimizer=optimizer, regress=regress)  
+  labels         =  get_cosmos(nruns, nseeds, nslice)
 
   ##  Load sims and train in explicit batches.
   ##  Note:  **  Tile ** ntile times to go through sims (rank ordered in cosmology).
@@ -166,8 +191,8 @@ if __name__ == '__main__':
     ##  Set y labels.                                                                                                                                                                                                                                                                                                
     y     = labels[zero * nslice: (zero + nsplit) * nslice, 2]
     
-    ##  128 x 128 pixels, for number of mocks in split x number of slices taken from 3D sim. 
-    X     = np.zeros((nsplit * nslice, 128, 128, 1))
+    ##  E.g.  128 x 128 pixels, for number of mocks in split x number of slices taken from 3D sim. 
+    X     = np.zeros((nsplit * nslice, nmesh, nmesh, 1))
     
     ##  Loop over mocks in split. 
     for iid in np.arange(nsplit):
@@ -179,12 +204,12 @@ if __name__ == '__main__':
       attrs           = _file.attrs
       mesh            = _file.preview()
 
-      print('Loading %d (Om = %.3lf, h=%.3lf)' % (zero + iid, attrs['Om0'], attrs['h']))
+      print('Loading %d (Om = %.3lf, f = %.3lf, h = %.3lf) with label %.3lf.' % (zero + iid, attrs['Om0'], attrs['Om0']**0.545, attrs['h'], y[iid * nslice]))
       
-      for sslice in np.arange(nslice):
+      for ii, sslice in enumerate(np.arange(0, nmesh, jump)):
         ##  Split 3D sim into _nslice_ 2D (x, z) slices;  Mesh returns (1 + delta). 
-        X[iid + nsplit * sslice, :, :, 0] = mesh[:, sslice, :] - 1.0
-    
+        X[iid + nsplit * ii, :, :, 0] = mesh[:, sslice, :] - 1.0
+        
     if not regress:
       ##  Bin sims in f and use bin index as a supervised label.                                                                                                                                                                                                                                                       
       fmin  = .25 ** 0.545
@@ -197,33 +222,37 @@ if __name__ == '__main__':
 
       ##  One-hot encode target column.                                                                                                                                                                                                                                                                               \
       y     = to_categorical(y, num_classes=nhot)
-
-      
-    ##  Get current predictions.     
-    yhat = model.predict(X)
-
-    ##  Plot current prediction against truth (regression or supervised).                                                                                                                                                                                                                                                                         
-    plot(y, yhat)
-     
+        
     if train:
+      '''
       ##  Note:  horizontal and vertical flipping of 2D slices.  
-      train_gen       = ImageDataGenerator(featurewise_center=False,\
-                                           rotation_range=0,\
-                                           width_shift_range=0.,\
-                                           height_shift_range=0.,\
-                                           horizontal_flip=True,\
-                                           vertical_flip=True,\
-                                           rescale=1.,\
-                                           preprocessing_function=pprocess,\
-                                           validation_split=valid_frac)  ##  Last Validation split. 
+      train_gen = ImageDataGenerator(featurewise_center=False,\
+                                     rotation_range=0,\
+                                     width_shift_range=0.,\
+                                     height_shift_range=0.,\
+                                     horizontal_flip=True,\
+                                     vertical_flip=True,\
+                                     rescale=1.,\
+                                     preprocessing_function=pprocess,\
+                                     validation_split=valid_frac)  ##  Last Validation split. 
 
       ##  Fit whitening params. 
       train_gen.fit(X)
       
       ##  Image generator for continous cretion with pre-processing;  steps_per_epoch=10 * len(X_train) / 32.
-      history         = model.fit_generator(train_gen.flow(X, y, batch_size=2000, shuffle=True),\
-                                            steps_per_epoch=6000, epochs=1)
-      
+      history = model.fit_generator(train_gen.flow(X, y, batch_size=256, shuffle=True),\
+                                    steps_per_epoch=8000, epochs=epochs, use_multiprocessing=True)
+      '''
+
+      history = model.fit(X, y, validation_split=0.3, epochs=epochs)
+
+      ##  Get current predictions.                                                                                                                                                                                                                                                                                                                
+      yhat = model.predict(X)
+
+      ##  Plot current prediction against truth (regression or supervised).                                                                                                                                                                                                                                                                       
+      plot(y, yhat)
+    
+      '''
       history         = history.history
       pickle.dump(history, open('history/history_%d.p' % zero, 'wb'))
 
@@ -233,6 +262,7 @@ if __name__ == '__main__':
         json_file.write(model_json)
       
       ##  model.save_weights('model.h5')
+      '''
       
     else:
       history = pickle.load(open('history/history_%d.p' % zero, 'rb'))
@@ -247,11 +277,12 @@ if __name__ == '__main__':
       ##  model.load_weights('model.h5')
 
       if regress:
-         model.compile(loss='mse', optimizer=optimizer, metrics=['accuracy'])
+         model.compile(loss='mae', optimizer=optimizer, metrics=['accuracy'])
         
       else:
         model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
+    '''
     ##  Test the predictions;  
     X_train, X_test, y_train, y_test = train_test_split(X[::-1, :, : ,:], y[::-1], test_size=valid_frac)
     
@@ -272,5 +303,6 @@ if __name__ == '__main__':
       plt.ylabel(stat.upper())
       plt.legend()
       plt.show()
-   
+    '''
+
 print('\n\nDone.\n\n')
