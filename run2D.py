@@ -97,12 +97,12 @@ def pprocess(X):
   axis = np.random.randint(2)
   npix = np.random.randint(128)
 
-  ##  note:  currently reading (1 + delta)?
+  ##  Random assignment of delta -> -delta. 
   sign = -1. ** np.random.randint(2)
 
   return  sign * np.roll(X, npix, axis=axis)
 
-def get_cosmos(nruns=1e99):
+def get_cosmos(nruns, nseeds, nslice):
   ##  Get list of available cosmologies.                                                                                                                                           
   cosmos = np.loadtxt('cosmo.txt').tolist()
   labels = []
@@ -114,12 +114,26 @@ def get_cosmos(nruns=1e99):
         labels.append(x)
 
   labels = np.array(labels)
-
   nruns  = np.minimum(nruns, len(labels) * nseeds)
 
   return  labels
 
+def plot(y, yhat, save=False):
+  fmin  = .25 ** 0.545
+  fmax  = .35 ** 0.545
 
+  fs    = np.linspace(fmin, fmax, 10)
+
+  pl.plot(fs,  fs, 'k-',   alpha=0.6)
+  pl.plot(y, yhat, 'o', markersize=2)
+
+  pl.xlabel(r'$f$')
+  pl.ylabel(r'$\hat f$')
+
+  pl.savefig('mlf.pdf')
+  os.system('xpdf mlf.pdf')
+
+    
 if __name__ == '__main__':
   print('\n\nWelcome to MLRSD-2D.\n\n')
 
@@ -127,11 +141,11 @@ if __name__ == '__main__':
 
   optimizer      =  adam
   
-  nseeds         =    10     ##  Number of random (seed) sims available in each cosmology. 
+  nseeds         =     9     ##  Number of random (seed) sims available in each cosmology. 
   nslice         =    10     ##  Sliced 3D sim. into _nslice_ (x, z) slices.  
   nhot           =    10     ##  Supervised:  label sims by bin index in f;  nhot == # of bins. 
   nruns          =   900     ##  Limit the total number of mocks input;  Set to e.g. 1e99 for all. 
-  nsplit         =   100     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
+  nsplit         =    50     ##  Split loading, storing and learning of mocks into batches of size nsplit. 
   ntile          =     1     ##  Number of load, train epochs through the data.      
   epochs         =     5     ##  Number of actual (keras) epochs. 
   valid_frac     =  0.15     ##  Split data X into fractions for train, validate/test.    
@@ -140,7 +154,7 @@ if __name__ == '__main__':
   
   model          = prep_model_2D_B(None, optimizer=optimizer, regress=regress)
 
-  labels         = get_cosmos(nruns)
+  labels         = get_cosmos(nruns, nseeds, nslice)
 
   ##  Load sims and train in explicit batches.
   ##  Note:  **  Tile ** ntile times to go through sims (rank ordered in cosmology).
@@ -148,26 +162,29 @@ if __name__ == '__main__':
   for split in np.tile(np.arange(ntimes), ntile): 
     ##  Zero index for this split. 
     zero  = np.int(split) * nsplit  
-  
+
+    ##  Set y labels.                                                                                                                                                                                                                                                                                                
+    y     = labels[zero * nslice: (zero + nsplit) * nslice, 2]
+    
     ##  128 x 128 pixels, for number of mocks in split x number of slices taken from 3D sim. 
     X     = np.zeros((nsplit * nslice, 128, 128, 1))
-
+    
     ##  Loop over mocks in split. 
     for iid in np.arange(nsplit):
-      print('Loading %d' % (zero + iid))
-
       ##  Load fastpm sim. 
       fpath           = os.environ['SCRATCH'] + '/fastpm/fpm-%d-1.0000' % (zero + iid)
+      _file           = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header')
+
+      ##  attrs: {'Om0', 'Ode0', 'h', 'shotnoise'}.
+      attrs           = _file.attrs
+      mesh            = _file.preview()
+
+      print('Loading %d (Om = %.3lf, h=%.3lf)' % (zero + iid, attrs['Om0'], attrs['h']))
       
-      mesh            = BigFileMesh(fpath, dataset='1/Field', mode='real', header='Header').preview()
-    
       for sslice in np.arange(nslice):
         ##  Split 3D sim into _nslice_ 2D (x, z) slices;  Mesh returns (1 + delta). 
         X[iid + nsplit * sslice, :, :, 0] = mesh[:, sslice, :] - 1.0
-
-
-    y = labels[zero * nslice: (zero + nsplit) * nslice, 2]
-
+    
     if not regress:
       ##  Bin sims in f and use bin index as a supervised label.                                                                                                                                                                                                                                                       
       fmin  = .25 ** 0.545
@@ -180,7 +197,14 @@ if __name__ == '__main__':
 
       ##  One-hot encode target column.                                                                                                                                                                                                                                                                               \
       y     = to_categorical(y, num_classes=nhot)
-        
+
+      
+    ##  Get current predictions.     
+    yhat = model.predict(X)
+
+    ##  Plot current prediction against truth (regression or supervised).                                                                                                                                                                                                                                                                         
+    plot(y, yhat)
+     
     if train:
       ##  Note:  horizontal and vertical flipping of 2D slices.  
       train_gen       = ImageDataGenerator(featurewise_center=False,\
