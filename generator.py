@@ -16,7 +16,7 @@ def write_filelist():
     for item in files:
         f.write("%s\n" % item)
   
-def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=True, nhot=10, _print=False): 
+def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=True, nhot=10, _print=False, Field='kField'): 
   f = open(fpath, 'r')
 
   while True:
@@ -37,22 +37,40 @@ def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=
         if mode == 'eval':
           break
 
-      _file = BigFileMesh(line, dataset='1/Field', mode='real', header='Header')    
-      attrs = _file.attrs
+      if Field == 'Field':
+        _file = BigFileMesh(line, dataset='1/Field', mode='real', header='Header')    
+        attrs = _file.attrs
 
-      ##  (1. + delta) on preview. 
-      mesh  = _file.preview() - 1.0
+        ##  (1. + delta) on preview. 
+        mesh  = _file.preview() - 1.0
 
-      if _print:
-        print('Loading mock:  (h = %.3lf, Om = %.3lf, f = %.3lf).' % (attrs['h'], attrs['Om0'], attrs['Om0']**0.545))
+        if _print:
+          print('Loading mock:  (h = %.3lf, Om = %.3lf, f = %.3lf).' % (attrs['h'], attrs['Om0'], attrs['Om0']**0.545))
 
-      for ii, sslice in enumerate(np.arange(0, nmesh, jump)):
-        ##  Split 3D sim into _nslice_ 2D (x, z) slices;  Mesh returns (1 + delta).
-        images.append(mesh[:, sslice, :])
+        for ii, sslice in enumerate(np.arange(0, nmesh, jump)):
+          ##  Split 3D sim into _nslice_ 2D (x, z) slices;  Mesh returns (1 + delta).
+          images.append(mesh[:, sslice, :])
+          labels.append([attrs['h'], attrs['Om0'], attrs['Om0']**0.545])
+
+          ##  Bin sims in f and use bin index as a supervised label.
+
+      elif Field == 'kField':
+        _file = BigFileMesh(line, dataset='1/kField', mode='complex', header='Header')
+        attrs = _file.attrs
+
+        if _print:
+          print('Loading mock:  (h = %.3lf, Om = %.3lf, f = %.3lf).' % (attrs['h'], attrs['Om0'], attrs['Om0']**0.545))
+        
+        field = _file.to_complex_field()
+        shape = field.shape
+
+        ##  Complex field (convolution?);  Arbitrary slice.  
+        images.append(_file.to_complex_field()[:,:,0])
         labels.append([attrs['h'], attrs['Om0'], attrs['Om0']**0.545])
-
-        ##  Bin sims in f and use bin index as a supervised label.
-
+        
+      else:
+        raise ValueError('\n\nRequested mode is not available.\n\n')
+          
     images   = np.array(images).reshape(batch_size, nmesh, nmesh, 1)
     labels   = np.array(labels)  
 
@@ -80,5 +98,5 @@ if __name__ == '__main__':
 
   fpath = './filelist.txt'
   
-  for x, y in generator(fpath, batch_size=32, nmesh=128, regress=True):
+  for x, y in generator(fpath, batch_size=32, nmesh=128, regress=True, nhot=10, _print=True, Field='kField'):
     pass
