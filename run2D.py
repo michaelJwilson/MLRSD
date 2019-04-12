@@ -98,7 +98,7 @@ if __name__ == '__main__':
                                   steps_per_epoch=8000, epochs=epochs, use_multiprocessing=True)
 
     ##  history = model.fit(X, y, validation_split=0.3, epochs=epochs)
-    (X_test, y_test)  = generator('./filelist.txt', batch_size=32, nmesh=nmesh, nslice=nslice, regress=regress, nhot=nhot)
+    (X_test, y_test) = generator('./filelist.txt', batch_size=32, nmesh=nmesh, nslice=nslice, regress=regress, nhot=nhot)
     
     ##  Get current predictions.
     y_hat = model.predict(X_test)

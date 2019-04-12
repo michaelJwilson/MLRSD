@@ -16,7 +16,7 @@ def write_filelist():
     for item in files:
         f.write("%s\n" % item)
   
-def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=True, nhot=10): 
+def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=True, nhot=10, _print=False): 
   f = open(fpath, 'r')
 
   while True:
@@ -42,8 +42,9 @@ def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=
 
       ##  (1. + delta) on preview. 
       mesh  = _file.preview() - 1.0
-    
-      print('Loading mock:  (h = %.3lf, Om = %.3lf, f = %.3lf).' % (attrs['h'], attrs['Om0'], attrs['Om0']**0.545))
+
+      if _print:
+        print('Loading mock:  (h = %.3lf, Om = %.3lf, f = %.3lf).' % (attrs['h'], attrs['Om0'], attrs['Om0']**0.545))
 
       for ii, sslice in enumerate(np.arange(0, nmesh, jump)):
         ##  Split 3D sim into _nslice_ 2D (x, z) slices;  Mesh returns (1 + delta).
@@ -52,7 +53,7 @@ def generator(fpath, batch_size=32, nmesh=128, nslice=16, mode='train', regress=
 
         ##  Bin sims in f and use bin index as a supervised label.
 
-    images   = np.array(images)
+    images   = np.array(images).reshape(batch_size, nmesh, nmesh, 1)
     labels   = np.array(labels)  
 
     ## Use f as label.
