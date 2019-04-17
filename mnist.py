@@ -1,17 +1,25 @@
 ##  import  matplotlib;                   matplotlib.use('Agg')
 
+import  tensorflow                    as      tf
+
 from    tensorflow.keras.datasets     import  mnist
 from    tensorflow.keras.utils        import  to_categorical
 from    tensorflow.keras.models       import  Sequential
 from    tensorflow.keras.layers       import  Dense, Conv2D, Flatten
 from    tensorflow.keras.models       import  model_from_json
+from    tensorflow.keras              import  backend
 
 ##  import  matplotlib.pyplot  as      plt
 ##  import  pylab              as      pl
-import  numpy              as      np
+import  numpy                         as      np
 
 
-train   = True
+train                           = True
+
+##  export CUDA_VISIBLE_DEVICES=1
+config                          = tf.ConfigProto(device_count = {'GPU': 0})
+session                         = tf.Session(config=config)
+backend.set_session(session)
 
 print('\n\nWelcome.\n\n')
 
