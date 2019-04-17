@@ -22,10 +22,8 @@ ipython kernelspec list
 ssh -Y mjwilson@n0000.es1
 
 ----------  INTERACTIVE  ----------
-salloc --time=00:30:00 --nodes=1 --partition es1  --constraint=es1_1080ti --qos=es_debug  ##  es_lowprio
+salloc --time=00:30:00 --nodes=1 --partition es1  --constraint=es1_1080ti --qos=es_debug  --gres=gpu:1 ##  es_lowprio
 srun --pty -u bash -i
-
-
 
 
 ----------  Check GPU availability  ---------- 

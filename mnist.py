@@ -17,7 +17,7 @@ import  numpy                         as      np
 train                           = True
 
 ##  export CUDA_VISIBLE_DEVICES=1
-config                          = tf.ConfigProto(device_count = {'GPU': 0})
+config                          = tf.ConfigProto(device_count = {'GPU': 1})
 session                         = tf.Session(config=config)
 backend.set_session(session)
 
