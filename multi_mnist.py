@@ -8,6 +8,7 @@ from    tensorflow.keras.models       import  Sequential
 from    tensorflow.keras.layers       import  Dense, Conv2D, Flatten
 from    tensorflow.keras.models       import  model_from_json
 from    tensorflow.keras              import  backend
+from    tensorflow.keras.utils        import  multi_gpu_model
 
 ##  import  matplotlib.pyplot  as      plt
 ##  import  pylab              as      pl
@@ -15,12 +16,12 @@ import  numpy                         as      np
 
 
 train                           = True
-
+'''
 ##  export CUDA_VISIBLE_DEVICES=1
 config                          = tf.ConfigProto(device_count = {'GPU': 1})
 session                         = tf.Session(config=config)
 backend.set_session(session)
-
+'''
 print('\n\nWelcome.\n\n')
 
 (_X_train, _y_train), (_X_test, _y_test) = mnist.load_data()
@@ -41,11 +42,12 @@ if train:
   model.add(Flatten())
   model.add(Dense(10, activation='softmax'))
 
-  model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+  pmodel = multi_gpu_model(model, gpus=2)
+  pmodel.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-  model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=3)
+  pmodel.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=3)
                                                                                                                  
-  model_json = model.to_json()
+  model_json = pmodel.to_json()
 
   with open('model.json', 'w') as json_file:
     json_file.write(model_json)

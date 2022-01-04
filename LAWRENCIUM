@@ -1,0 +1,37 @@
+----------  Group  ----------
+pc_mldarkenergy
+
+
+----------  CONDA ENV  ----------
+module load python/3.6
+module load cuda/10.0
+module load xpdf
+
+conda install tensorflow-gpu -c intel
+conda install ipykernel 
+
+
+----------  JUPYTER  ----------
+python -m ipykernel install --user --name ntf --display-name NTF
+
+List kernels:
+ipython kernelspec list
+/global/home/users/mjwilson/.local/share/jupyter/kernels/ntf
+
+##  ssh to allocated worked on Lawrencium.
+ssh -Y mjwilson@n0000.es1
+
+----------  INTERACTIVE  ----------
+##  --constraint=es1_1080ti;  --gres=gpu:1;  es_lowprio
+##  srun --pty  --time=00:30:00 --nodes=1 -p es1  --constraint=es1_v100 --qos=es_debug  bash
+srun --pty  --time=00:30:00 --nodes=1 -p es1  --constraint=es1_1080ti --qos=es_debug  bash 
+
+----------  Check GPU availability  ---------- 
+nvidia-smi
+
+** 
+from tensorflow.python.client import device_lib
+
+x = device_lib.list_local_devices()
+
+print(x)
