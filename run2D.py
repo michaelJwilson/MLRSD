@@ -4,6 +4,9 @@ import  os
 import  json
 import  copy
 import  tensorflow         as      tf
+import  pylab              as      pl
+import  numpy              as      np
+import  matplotlib.pyplot  as      plt
 
 from    tensorflow.keras.utils                import  to_categorical
 from    tensorflow.keras.models               import  Sequential
@@ -12,10 +15,7 @@ from    tensorflow.keras.models               import  model_from_json
 from    tensorflow.keras.optimizers           import  Adam, Nadam
 from    tensorflow.keras.preprocessing.image  import  ImageDataGenerator
 from    nbodykit.lab                          import  LinearMesh, cosmology, BigFileMesh, BigFileCatalog
-
-import  matplotlib.pyplot  as      plt
-import  pylab              as      pl
-import  numpy              as      np
+from    sklearn.model_selection               import  train_test_split
 
 
 ##  Define optimizers. 
@@ -79,6 +79,33 @@ def prep_model_2D_B(nhot, optimizer=adam):
 
   return  model
 
+def prep_model_2D_B_regress(optimizer=adam):
+  model = Sequential()
+
+  model.add(SeparableConv2D(32, (3, 3), activation='linear', input_shape=(128, 128, 1)))
+  model.add(LeakyReLU(alpha=0.03))
+  model.add(MaxPooling2D((2, 2)))
+  model.add(SeparableConv2D(64, (3, 3), activation='linear'))
+  model.add(LeakyReLU(alpha=0.03))
+  model.add(MaxPooling2D((2, 2)))
+  model.add(SeparableConv2D(64, (3, 3), activation='linear'))
+  model.add(LeakyReLU(alpha=0.03))
+  model.add(BatchNormalization())   ##  Batch renormalization should come late.                                                                                                                                                                                                          
+  model.add(MaxPooling2D((2, 2)))
+  model.add(Flatten())
+  model.add(Dense(32, activation='relu'))
+  model.add(Dropout(0.1))
+  
+  ##  Regression model.  Output constrained to [0., 1.] as appropriate for f. 
+  model.add(layers.Dense(1), activation='sigmoid')
+
+  model.compile(optimizer=adam, loss='mae', metrics=['accuracy'])
+
+  model.summary()
+
+  return  model
+
+
 def pprocess(X):
   ##  Pre-process each 2D n-body slice:
   ##  --  Roll along random axis by random int npix
@@ -109,7 +136,8 @@ if __name__ == '__main__':
   train   = True
 
   ##  Set up the model.
-  model   = prep_model_2D_B(nhot, optimizer=adam)
+  ##  model   = prep_model_2D_B(nhot, optimizer=adam)
+  model   = prep_model_2D_B_regress(optimizer=adam)
 
   ##  Get list of available cosmologies. 
   cosmos  = np.loadtxt('cosmo.txt').tolist()
@@ -173,15 +201,16 @@ if __name__ == '__main__':
       train_gen.fit(X_train)
 
       _labels         = labels[zero * nslice: (zero + nsplit) * nslice]
-      _y_train        = np.digitize(_labels[:,2], bins) 
 
-      ##  One-hot encode target column.
+      ##  Digitze and one-hot encode target column.
+      _y_train        = np.digitize(_labels[:,2], bins)
       y_train         = to_categorical(_y_train, num_classes=nhot)
 
-      ##  validation_data = (X_test, y_test)
-      ##  history         = model.fit(X_train, y_train, epochs=20, batch_size=32, shuffle=True, validation_split=0.15)
+      ##  Regress.
+      y_train         = _labels
 
       ##  Image generator for continous cretion with pre-processing. 
+      ##  Note:  Last fraction is saved for validation. 
       history         = model.fit_generator(train_gen.flow(X_train, y_train, batch_size=32, shuffle=True),\
                                             steps_per_epoch=10 * len(X_train) / 32, epochs=epochs)
       

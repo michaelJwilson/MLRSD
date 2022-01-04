@@ -5,7 +5,7 @@ from   tensorflow.keras.applications import vgg19
 from   tensorflow.keras.preprocessing.image import load_img, img_to_array
 from   tensorflow.keras import backend as K
 from   scipy.optimize import fmin_l_bfgs_b
-from   scipy.misc import imsave
+from   imageio import imwrite
 
 
 class Evaluator(object):
@@ -126,9 +126,9 @@ fetch_loss_and_grads = K.function([combination_image], [loss, grads])
 evaluator = Evaluator()
 
 result_prefix = 'spergel_vangogh'
-iterations = 100
-x = preprocess_image(target_image_path) 
-x= x.flatten()
+iterations    = 100
+x             = preprocess_image(target_image_path) 
+x             = x.flatten()
 
 for i in range(iterations):
     print('Start of iteration', i)
@@ -142,7 +142,7 @@ for i in range(iterations):
     img = x.copy().reshape((img_height, img_width, 3))
     img = deprocess_image(img)
     fname = result_prefix + '_at_iteration_%d.png' % i
-    imsave(fname, img)
+    imwrite(fname, img)
     print('Image saved as', fname)
     end_time = time.time()
     print('Iteration %d completed in %ds' % (i, end_time - start_time))
